@@ -48,7 +48,7 @@
     #Only packet Winlink sessions will work with the TNC in the Kenwood D75. VARA FM WILL NOT work.
 #END HELP
 
-version=2
+version=2.1
 #version 2 added menu shortcut creation
 mydir="$(cd "$(dirname "$0")" && pwd)"
 LOGO=/usr/share/icons/Adwaita/32x32/devices/phone-old-symbolic.symbolic.png
@@ -58,7 +58,7 @@ mac=$(cat ${mac_file})
 
 splash(){
     yad --width=200 --height=200 --title="D75 Connect" --timeout=2 --image ${LOGO} --text-align=center --skip-taskbar --image-on-top \
-    --wrap --no-buttons --center --window-icon=${LOGO} --undecorated --text="<big><b>\r\r\r\rD75 Connect\rversion ${version}</b></big>\rKM4ACK"
+    --wrap --no-buttons --center --window-icon=${LOGO} --undecorated --text="<big><b>\r\r\r\rD75 Connect\rversion ${version}</b></big>\rKM4ACK\rmodded by N2YQT"
 
 }
 
@@ -117,20 +117,22 @@ MAIN(){
     #MAIN MENU
     MENU=$(yad --image $LOGO --window-icon=$LOGO --form --width=400 --text="<b>D75 Connect v${version}</b>\rMAC = ${mac}" --text-align=center --center --title="D75 Connect" \
     --button="Winlink":2 \
-    --button="YAAC":5 \
-    --button="GPS":3 \
-    --button="Kill Connection":4 \
-    --button="Scan":6 \
+    --button="YAAC":6 \
+    --button="D75 GPS":3 \
+    --button="IC705 GPS":4 \
+    --button="Kill Connection":5 \
+    --button="Scan":7 \
     --button=Quit:1 )
     BUT=$?
 
     case $BUT in
         1) quit ;;
         2) pair_winlink ;;
-        3) pair_gps ;;
-        4) kill_connection ;;
-        5) yaac ;;
-        6) scan ;;
+        3) pair_D75gps ;;
+        4) pair_IC705gps ;;
+        5) kill_connection ;;
+        6) yaac ;;
+        7) scan ;;
         252) quit ;;
     esac
 }
@@ -220,7 +222,7 @@ pair_winlink(){
     MAIN
 }
 
-pair_gps(){
+pair_D75gps(){
     #function pairs with radio and updates /etc/default/gpsd file for GPS over rfcomm0
     check
     yad --title="D75 Connect" --width=400 --height=100 \
@@ -244,6 +246,30 @@ pair_gps(){
     MAIN
 }
 
+pair_IC705gps(){
+    #function pairs with radio and updates /etc/default/gpsd file for GPS over rfcomm0
+    check
+    yad --title="D75 Connect" --width=400 --height=100 \
+        --image $LOGO --window-icon=$LOGO --image-on-top --text-align=center \
+        --center --form --text="\r\r\r\rBe sure Bluetooth is enabled and the TNC is <b>disabled</b>\rThen press ok" \
+        --button=gtk-ok
+#    sudo -A rfcomm bind /dev/rfcomm0 ${mac} 2
+
+    cp /etc/default/gpsd /run/user/$UID
+
+    sed -i "s|DEVICES=.*|DEVICES=\"/dev/serial/by-id/usb-Icom_Inc._IC-705_IC-705_12005791-if02\"|" /run/user/$UID/gpsd
+
+    sudo -A cp /run/user/$UID/gpsd /etc/default/
+
+    sudo -A systemctl restart gpsd
+
+    yad --center --height="300" --width="300" --form --separator="|" --item-separator="|" --title="GPS" \
+    --image $LOGO --window-icon=$LOGO --image-on-top \
+    --text="\r\r\r\r\r<b><big>GPS had been updated</big></b>" \
+    --button="OK":1
+    MAIN
+}
+
 kill_connection(){
     #function kills existing connection(s)
     kill ${yaac_pid}
@@ -252,7 +278,7 @@ kill_connection(){
     #next lines are needed to clear rfcomm from gpsd config file so that the GPS
     #will not try to take over when we enable a TNC connection
     if [[ -n `grep rfcomm /etc/default/gpsd` ]]; then
-        sed -i "s|DEVICES=.*|DEVICES=\"/dev/\"|" /run/user/$UID/gpsd
+        sed -i "s|DEVICES=.*|DEVICES=\"/dev/serial/by-id/usb-Icom_Inc._IC-705_IC-705_12005791-if02\"|" /run/user/$UID/gpsd
         sudo -A cp /run/user/$UID/gpsd /etc/default/
         sudo -A systemctl restart gpsd
     fi
